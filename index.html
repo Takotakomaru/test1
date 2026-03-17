@@ -1,74 +1,216 @@
-import random
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Mini Strategy Game</title>
 
-class Country:
-    def __init__(self, name, army, industry, resources):
-        self.name = name
-        self.army = army
-        self.industry = industry
-        self.resources = resources
-        self.alive = True
+<style>
 
-    def produce(self):
-        produced = self.industry + random.randint(0, 3)
-        self.army += produced
-        print(f"{self.name} produced {produced} troops.")
+body{
+font-family:Arial;
+background:#111;
+color:white;
+text-align:center;
+}
 
-    def attack(self, enemy):
-        if not enemy.alive:
-            return
-        
-        attack_power = self.army * random.uniform(0.5, 1.5)
-        defense_power = enemy.army * random.uniform(0.5, 1.5)
+#map{
+display:grid;
+grid-template-columns:repeat(8,60px);
+grid-gap:2px;
+justify-content:center;
+margin-top:20px;
+}
 
-        print(f"{self.name} attacks {enemy.name}!")
+.tile{
+width:60px;
+height:60px;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:12px;
+border:1px solid #333;
+}
 
-        if attack_power > defense_power:
-            loss = random.randint(5,15)
-            enemy.army -= loss
-            print(f"{enemy.name} lost {loss} troops!")
-        else:
-            loss = random.randint(5,15)
-            self.army -= loss
-            print(f"{self.name} lost {loss} troops!")
+.Japan{background:#e74c3c;}
+.Germany{background:#3498db;}
+.USA{background:#2ecc71;}
+.USSR{background:#f1c40f;color:black;}
 
-        if enemy.army <= 0:
-            enemy.alive = False
-            print(f"{enemy.name} has collapsed!")
+button{
+margin-top:20px;
+padding:10px 20px;
+font-size:16px;
+cursor:pointer;
+}
 
-class Game:
+#log{
+margin-top:20px;
+height:200px;
+overflow:auto;
+background:#222;
+padding:10px;
+width:500px;
+margin-left:auto;
+margin-right:auto;
+text-align:left;
+}
 
-    def __init__(self):
-        self.turn = 1
-        self.countries = [
-            Country("Japan", 50, 10, 20),
-            Country("Germany", 60, 12, 15),
-            Country("USA", 80, 15, 25),
-            Country("Soviet Union", 70, 13, 20)
-        ]
+</style>
+</head>
 
-    def alive_countries(self):
-        return [c for c in self.countries if c.alive]
+<body>
 
-    def run_turn(self):
-        print("\n------ Turn", self.turn, "------")
+<h1>Mini HOI4-like Strategy Game</h1>
 
-        for c in self.alive_countries():
-            c.produce()
+<div id="map"></div>
 
-        attacker = random.choice(self.alive_countries())
-        target = random.choice([c for c in self.alive_countries() if c != attacker])
+<button onclick="nextTurn()">Next Turn</button>
 
-        attacker.attack(target)
+<div id="log"></div>
 
-        self.turn += 1
+<script>
 
-    def run(self):
-        while len(self.alive_countries()) > 1:
-            self.run_turn()
+const width = 8
+const height = 8
 
-        winner = self.alive_countries()[0]
-        print("\nWinner:", winner.name)
+let map = []
 
-game = Game()
-game.run()　
+const countries = {
 
+Japan:{army:50,color:"Japan"},
+Germany:{army:50,color:"Germany"},
+USA:{army:50,color:"USA"},
+USSR:{army:50,color:"USSR"}
+
+}
+
+function randomCountry(){
+
+let keys = Object.keys(countries)
+return keys[Math.floor(Math.random()*keys.length)]
+
+}
+
+function createMap(){
+
+for(let y=0;y<height;y++){
+
+for(let x=0;x<width;x++){
+
+let owner = randomCountry()
+
+map.push({
+owner:owner,
+industry:Math.floor(Math.random()*3)+1
+})
+
+}
+
+}
+
+}
+
+function drawMap(){
+
+const mapDiv = document.getElementById("map")
+mapDiv.innerHTML=""
+
+map.forEach((tile,i)=>{
+
+let div=document.createElement("div")
+
+div.className="tile "+tile.owner
+div.innerHTML=tile.industry
+
+mapDiv.appendChild(div)
+
+})
+
+}
+
+function log(text){
+
+let logDiv=document.getElementById("log")
+logDiv.innerHTML+=text+"<br>"
+logDiv.scrollTop=logDiv.scrollHeight
+
+}
+
+function produce(){
+
+for(let c in countries){
+
+let production=0
+
+map.forEach(tile=>{
+
+if(tile.owner===c)
+production+=tile.industry
+
+})
+
+countries[c].army+=production
+
+log(c+" produced "+production+" troops")
+
+}
+
+}
+
+function attack(){
+
+let attacker=randomCountry()
+
+let fromIndex=Math.floor(Math.random()*map.length)
+
+let toIndex=fromIndex+[-1,1,width,-width][Math.floor(Math.random()*4)]
+
+if(toIndex<0||toIndex>=map.length)return
+
+let from=map[fromIndex]
+let to=map[toIndex]
+
+if(from.owner!==attacker)return
+if(to.owner===attacker)return
+
+let defender=to.owner
+
+let attackPower=countries[attacker].army*Math.random()
+let defensePower=countries[defender].army*Math.random()
+
+if(attackPower>defensePower){
+
+to.owner=attacker
+
+countries[defender].army-=5
+
+log(attacker+" captured territory from "+defender)
+
+}else{
+
+countries[attacker].army-=5
+
+log(defender+" defended territory")
+
+}
+
+}
+
+function nextTurn(){
+
+produce()
+
+for(let i=0;i<5;i++)
+attack()
+
+drawMap()
+
+}
+
+createMap()
+drawMap()
+
+</script>
+
+</body>
+</html>
