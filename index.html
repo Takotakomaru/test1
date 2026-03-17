@@ -2,65 +2,76 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Mini Strategy Game</title>
+<title>Mini World Strategy Game</title>
 
 <style>
 
 body{
-font-family:Arial;
 background:#111;
 color:white;
+font-family:Arial;
 text-align:center;
+}
+
+#ui{
+margin-bottom:10px;
+font-size:18px;
 }
 
 #map{
 display:grid;
-grid-template-columns:repeat(8,60px);
-grid-gap:2px;
+grid-template-columns:repeat(16,40px);
+grid-gap:1px;
 justify-content:center;
-margin-top:20px;
 }
 
 .tile{
-width:60px;
-height:60px;
+width:40px;
+height:40px;
+font-size:9px;
 display:flex;
 align-items:center;
 justify-content:center;
-font-size:12px;
-border:1px solid #333;
+text-align:center;
+border:1px solid #222;
+}
+
+.sea{
+background:#0b3d91;
 }
 
 .Japan{background:#e74c3c;}
 .Germany{background:#3498db;}
 .USA{background:#2ecc71;}
 .USSR{background:#f1c40f;color:black;}
+.China{background:#9b59b6;}
 
 button{
-margin-top:20px;
+margin-top:10px;
 padding:10px 20px;
 font-size:16px;
 cursor:pointer;
 }
 
 #log{
-margin-top:20px;
-height:200px;
-overflow:auto;
+margin-top:10px;
 background:#222;
-padding:10px;
-width:500px;
+height:160px;
+overflow:auto;
+width:650px;
 margin-left:auto;
 margin-right:auto;
+padding:8px;
 text-align:left;
 }
 
 </style>
 </head>
-
 <body>
 
-<h1>Mini HOI4-like Strategy Game</h1>
+<h2>Mini World Strategy Game</h2>
+
+<div id="ui"></div>
 
 <div id="map"></div>
 
@@ -70,26 +81,35 @@ text-align:left;
 
 <script>
 
-const width = 8
-const height = 8
+const width=16
+const height=10
 
-let map = []
+const playerCountry="Japan"
 
-const countries = {
-
-Japan:{army:50,color:"Japan"},
-Germany:{army:50,color:"Germany"},
-USA:{army:50,color:"USA"},
-USSR:{army:50,color:"USSR"}
-
+const countries={
+Japan:{army:50},
+USA:{army:60},
+Germany:{army:55},
+USSR:{army:65},
+China:{army:70}
 }
 
-function randomCountry(){
+const worldMap=[
 
-let keys = Object.keys(countries)
-return keys[Math.floor(Math.random()*keys.length)]
+"~~~~~~~UUUU~~~~",
+"~~~~~~~UUUU~~~~",
+"~~GGGG~~~UU~~~~",
+"~~GGGG~~~UU~~~~",
+"~~~~~CCCCCC~~~~",
+"~~~~~CCCCCC~~~~",
+"~~~~~~~JJJ~~~~~",
+"~~~~~~~JJJ~~~~~",
+"~~~~~~~~~~~~~~~",
+"~~~~~~~~~~~~~~~"
 
-}
+]
+
+let map=[]
 
 function createMap(){
 
@@ -97,9 +117,23 @@ for(let y=0;y<height;y++){
 
 for(let x=0;x<width;x++){
 
-let owner = randomCountry()
+let c=worldMap[y][x]
+
+if(c==="~"){
+
+map.push({type:"sea"})
+
+}else{
+
+let owner={
+U:"USA",
+G:"Germany",
+C:"China",
+J:"Japan"
+}[c]
 
 map.push({
+type:"land",
 owner:owner,
 industry:Math.floor(Math.random()*3)+1
 })
@@ -110,29 +144,50 @@ industry:Math.floor(Math.random()*3)+1
 
 }
 
+}
+
 function drawMap(){
 
-const mapDiv = document.getElementById("map")
+let mapDiv=document.getElementById("map")
 mapDiv.innerHTML=""
 
-map.forEach((tile,i)=>{
+map.forEach(tile=>{
 
-let div=document.createElement("div")
+let d=document.createElement("div")
 
-div.className="tile "+tile.owner
-div.innerHTML=tile.industry
+if(tile.type==="sea"){
 
-mapDiv.appendChild(div)
+d.className="tile sea"
+d.innerHTML=""
+
+}else{
+
+d.className="tile "+tile.owner
+d.innerHTML=tile.owner
+
+}
+
+mapDiv.appendChild(d)
 
 })
 
 }
 
-function log(text){
+function log(t){
 
-let logDiv=document.getElementById("log")
-logDiv.innerHTML+=text+"<br>"
-logDiv.scrollTop=logDiv.scrollHeight
+let l=document.getElementById("log")
+l.innerHTML+=t+"<br>"
+l.scrollTop=l.scrollHeight
+
+}
+
+function updateUI(){
+
+let playerArmy=countries[playerCountry].army
+
+document.getElementById("ui").innerHTML=
+"Your Country: "+playerCountry+
+" | Army: "+playerArmy
 
 }
 
@@ -140,18 +195,13 @@ function produce(){
 
 for(let c in countries){
 
-let production=0
+let prod=0
 
-map.forEach(tile=>{
-
-if(tile.owner===c)
-production+=tile.industry
-
+map.forEach(t=>{
+if(t.owner===c) prod+=t.industry||0
 })
 
-countries[c].army+=production
-
-log(c+" produced "+production+" troops")
+countries[c].army+=prod
 
 }
 
@@ -159,38 +209,39 @@ log(c+" produced "+production+" troops")
 
 function attack(){
 
-let attacker=randomCountry()
+let landTiles=map
+.map((t,i)=>({tile:t,index:i}))
+.filter(t=>t.tile.type==="land")
 
-let fromIndex=Math.floor(Math.random()*map.length)
+let from=landTiles[Math.floor(Math.random()*landTiles.length)]
 
-let toIndex=fromIndex+[-1,1,width,-width][Math.floor(Math.random()*4)]
+let directions=[-1,1,width,-width]
+
+let toIndex=from.index+directions[Math.floor(Math.random()*4)]
 
 if(toIndex<0||toIndex>=map.length)return
 
-let from=map[fromIndex]
-let to=map[toIndex]
+let target=map[toIndex]
 
-if(from.owner!==attacker)return
-if(to.owner===attacker)return
+if(target.type!=="land")return
+if(target.owner===from.tile.owner)return
 
-let defender=to.owner
+let attacker=from.tile.owner
+let defender=target.owner
 
-let attackPower=countries[attacker].army*Math.random()
-let defensePower=countries[defender].army*Math.random()
+let atk=countries[attacker].army*Math.random()
+let def=countries[defender].army*Math.random()
 
-if(attackPower>defensePower){
+if(atk>def){
 
-to.owner=attacker
-
+target.owner=attacker
 countries[defender].army-=5
 
-log(attacker+" captured territory from "+defender)
+log(attacker+" captured land from "+defender)
 
 }else{
 
 countries[attacker].army-=5
-
-log(defender+" defended territory")
 
 }
 
@@ -200,15 +251,18 @@ function nextTurn(){
 
 produce()
 
-for(let i=0;i<5;i++)
+for(let i=0;i<8;i++){
 attack()
+}
 
 drawMap()
+updateUI()
 
 }
 
 createMap()
 drawMap()
+updateUI()
 
 </script>
 
