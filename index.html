@@ -2,112 +2,113 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Playable Strategy Game</title>
+<title>Full Strategy Game</title>
 
 <style>
-body{
-background:#0f172a;
-color:white;
-text-align:center;
-font-family:Arial;
-}
-
-#map{
-display:grid;
-grid-template-columns:repeat(10,50px);
-gap:2px;
-justify-content:center;
-margin-top:20px;
-}
-
-.tile{
-width:50px;
-height:50px;
-display:flex;
-align-items:center;
-justify-content:center;
-font-size:12px;
-cursor:pointer;
-border:2px solid #111;
-}
-
-.selected{
-border:2px solid white;
-}
-
+body{background:#0f172a;color:white;font-family:Arial;text-align:center;}
+#top{background:#1e293b;padding:10px;}
+#map{display:grid;grid-template-columns:repeat(12,50px);gap:2px;justify-content:center;margin-top:10px;}
+.tile{width:50px;height:50px;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid #111;cursor:pointer;}
+.selected{border:2px solid white;}
 .Japan{background:#ef4444;}
 .Enemy{background:#3b82f6;}
+.Neutral{background:#666;}
 .sea{background:#1d4ed8;}
-
-#info{
-margin-top:10px;
-}
-
-button{
-margin-top:10px;
-padding:10px;
-}
+#panel{margin-top:10px;}
+button{padding:8px;margin:3px;}
+#log{background:#111;width:700px;height:200px;overflow:auto;margin:auto;margin-top:10px;text-align:left;padding:5px;}
 </style>
 
 </head>
 <body>
 
-<h2>Strategy Game（操作できる版）</h2>
-
-<div id="info">クリックでユニットを動かせ</div>
+<div id="top">
+国: <span id="country"></span> |
+軍: <span id="army"></span> |
+工業: <span id="industry"></span> |
+ターン: <span id="turn"></span>
+</div>
 
 <div id="map"></div>
 
+<div id="panel">
+<button onclick="produceUnit()">ユニット生産</button>
 <button onclick="endTurn()">ターン終了</button>
+</div>
+
+<div id="log"></div>
 
 <script>
 
-const W=10,H=10
-let map=[]
+// ================= 基本設定 =================
+const W=12,H=12
+const PLAYER="Japan"
+let turn=1
 let selected=null
+let map=[]
 
+// ================= 国家 =================
+const countries={
+Japan:{army:50},
+Enemy:{army:60},
+Neutral:{army:0}
+}
+
+// ================= ログ =================
+function log(t){
+let l=document.getElementById("log")
+l.innerHTML+=t+"<br>"
+l.scrollTop=l.scrollHeight
+}
+
+// ================= マップ生成 =================
 function createMap(){
-
 for(let i=0;i<W*H;i++){
 
-let type=Math.random()<0.2?"sea":"land"
+let type=Math.random()<0.15?"sea":"land"
 
 if(type==="sea"){
 map.push({type:"sea"})
 }else{
 
-let owner=Math.random()<0.5?"Japan":"Enemy"
+let ownerRand=Math.random()
+let owner="Neutral"
+
+if(ownerRand<0.4) owner="Japan"
+else if(ownerRand<0.8) owner="Enemy"
 
 map.push({
 type:"land",
 owner:owner,
-unit:{
+industry:Math.floor(Math.random()*3)+1,
+unit: Math.random()<0.3 ? {
 owner:owner,
-str:Math.floor(Math.random()*10)+5
-}
+hp:20,
+atk:Math.floor(Math.random()*10)+5
+} : null
 })
 
 }
 
 }
-
 }
 
+// ================= 描画 =================
 function draw(){
-
 const m=document.getElementById("map")
 m.innerHTML=""
 
 map.forEach((t,i)=>{
 
 let d=document.createElement("div")
-
 d.className="tile "+(t.owner||"sea")
 
 if(i===selected) d.classList.add("selected")
 
 if(t.type==="land"){
-d.innerHTML=t.unit?t.unit.str:""
+if(t.unit){
+d.innerHTML=t.unit.hp+"<br>"+t.unit.atk
+}
 }
 
 d.onclick=()=>clickTile(i)
@@ -115,27 +116,41 @@ d.onclick=()=>clickTile(i)
 m.appendChild(d)
 
 })
-
 }
 
+// ================= UI更新 =================
+function updateUI(){
+
+let army=countries[PLAYER].army
+let ind=0
+
+map.forEach(t=>{
+if(t.owner===PLAYER) ind+=t.industry||0
+})
+
+document.getElementById("country").innerText=PLAYER
+document.getElementById("army").innerText=army
+document.getElementById("industry").innerText=ind
+document.getElementById("turn").innerText=turn
+}
+
+// ================= クリック処理 =================
 function clickTile(i){
 
-let tile=map[i]
+let t=map[i]
 
 // 選択
 if(selected===null){
-
-if(tile.unit && tile.unit.owner==="Japan"){
+if(t.unit && t.unit.owner===PLAYER){
 selected=i
 draw()
 }
-
 return
 }
 
-// 移動/攻撃
+// 移動
 let from=map[selected]
-let to=tile
+let to=map[i]
 
 let dirs=[-1,1,W,-W]
 
@@ -145,7 +160,7 @@ draw()
 return
 }
 
-// 海は不可
+// 海不可
 if(to.type==="sea"){
 selected=null
 draw()
@@ -155,17 +170,9 @@ return
 // 戦闘
 if(to.unit){
 
-if(to.unit.owner!=="Japan"){
+if(to.unit.owner!==PLAYER){
 
-if(from.unit.str>to.unit.str){
-
-to.unit=from.unit
-to.owner="Japan"
-from.unit=null
-
-}else{
-from.unit=null
-}
+battle(from,to)
 
 }else{
 
@@ -177,19 +184,90 @@ from.unit=null
 
 }else{
 
-// 空き地移動
+// 空地
 to.unit=from.unit
-to.owner="Japan"
+to.owner=PLAYER
 from.unit=null
 
 }
 
 selected=null
 draw()
+updateUI()
 
 }
 
-function enemyTurn(){
+// ================= 戦闘 =================
+function battle(a,b){
+
+let atk=a.unit
+let def=b.unit
+
+def.hp -= atk.atk
+
+if(def.hp<=0){
+b.unit=atk
+b.owner=PLAYER
+a.unit=null
+log("占領成功")
+return
+}
+
+atk.hp -= def.atk
+
+if(atk.hp<=0){
+a.unit=null
+log("攻撃失敗")
+}
+
+}
+
+// ================= 生産 =================
+function produce(){
+
+for(let c in countries){
+
+let prod=0
+
+map.forEach(t=>{
+if(t.owner===c) prod+=t.industry||0
+})
+
+countries[c].army+=prod
+
+}
+
+}
+
+// ================= ユニット生産 =================
+function produceUnit(){
+
+for(let i=0;i<map.length;i++){
+
+let t=map[i]
+
+if(t.owner===PLAYER && !t.unit){
+
+t.unit={
+owner:PLAYER,
+hp:20,
+atk:10
+}
+
+countries[PLAYER].army-=10
+log("ユニット生産")
+
+draw()
+updateUI()
+return
+}
+
+}
+
+}
+
+// ================= 敵AI =================
+function enemyAI(){
 
 map.forEach((t,i)=>{
 
@@ -212,15 +290,7 @@ t.unit=null
 
 }else if(target.unit.owner==="Japan"){
 
-if(t.unit.str>target.unit.str){
-
-target.unit=t.unit
-target.owner="Enemy"
-t.unit=null
-
-}else{
-t.unit=null
-}
+battle(t,target)
 
 }
 
@@ -230,15 +300,46 @@ t.unit=null
 
 }
 
-function endTurn(){
+// ================= 勝利判定 =================
+function checkWin(){
 
-enemyTurn()
-draw()
+let playerLand=0
+let enemyLand=0
+
+map.forEach(t=>{
+if(t.owner==="Japan") playerLand++
+if(t.owner==="Enemy") enemyLand++
+})
+
+if(enemyLand===0){
+alert("勝利！")
+location.reload()
+}
+
+if(playerLand===0){
+alert("敗北…")
+location.reload()
+}
 
 }
 
+// ================= ターン =================
+function endTurn(){
+
+produce()
+enemyAI()
+turn++
+
+draw()
+updateUI()
+checkWin()
+
+}
+
+// ================= 初期化 =================
 createMap()
 draw()
+updateUI()
 
 </script>
 
