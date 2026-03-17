@@ -2,114 +2,126 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Mini World Strategy Game</title>
+<title>Mini HOI4 Browser Game</title>
 
 <style>
 
 body{
-background:#111;
+background:#0f172a;
 color:white;
 font-family:Arial;
 text-align:center;
 }
 
-#ui{
-margin-bottom:10px;
-font-size:18px;
+#topbar{
+padding:10px;
+background:#1e293b;
 }
 
 #map{
 display:grid;
-grid-template-columns:repeat(16,40px);
-grid-gap:1px;
+grid-template-columns:repeat(20,35px);
+gap:1px;
 justify-content:center;
+margin-top:10px;
 }
 
 .tile{
-width:40px;
-height:40px;
-font-size:9px;
+width:35px;
+height:35px;
+font-size:8px;
 display:flex;
 align-items:center;
 justify-content:center;
-text-align:center;
-border:1px solid #222;
+border:1px solid #111;
 }
 
-.sea{
-background:#0b3d91;
-}
+.sea{background:#1d4ed8}
 
-.Japan{background:#e74c3c;}
-.Germany{background:#3498db;}
-.USA{background:#2ecc71;}
-.USSR{background:#f1c40f;color:black;}
-.China{background:#9b59b6;}
+.Japan{background:#ef4444}
+.Germany{background:#3b82f6}
+.USA{background:#22c55e}
+.USSR{background:#facc15;color:black}
+.China{background:#a855f7}
+
+#panel{
+margin-top:10px;
+}
 
 button{
-margin-top:10px;
-padding:10px 20px;
-font-size:16px;
-cursor:pointer;
+padding:8px 15px;
+margin:5px;
 }
 
 #log{
-margin-top:10px;
-background:#222;
-height:160px;
+background:#111;
+width:700px;
+height:180px;
 overflow:auto;
-width:650px;
-margin-left:auto;
-margin-right:auto;
-padding:8px;
+margin:auto;
+margin-top:10px;
 text-align:left;
+padding:6px;
 }
 
 </style>
 </head>
+
 <body>
 
-<h2>Mini World Strategy Game</h2>
-
-<div id="ui"></div>
+<div id="topbar">
+Player Country: <span id="playerCountry"></span>
+ | Army: <span id="army"></span>
+ | Industry: <span id="industry"></span>
+</div>
 
 <div id="map"></div>
 
+<div id="panel">
 <button onclick="nextTurn()">Next Turn</button>
+</div>
 
 <div id="log"></div>
 
 <script>
 
-const width=16
-const height=10
+const width=20
+const height=12
 
-const playerCountry="Japan"
+const PLAYER="Japan"
 
 const countries={
-Japan:{army:50},
-USA:{army:60},
-Germany:{army:55},
-USSR:{army:65},
-China:{army:70}
+Japan:{army:80,industry:0},
+USA:{army:100,industry:0},
+Germany:{army:90,industry:0},
+USSR:{army:120,industry:0},
+China:{army:110,industry:0}
 }
 
-const worldMap=[
+const mapTemplate=[
 
-"~~~~~~~UUUU~~~~",
-"~~~~~~~UUUU~~~~",
-"~~GGGG~~~UU~~~~",
-"~~GGGG~~~UU~~~~",
-"~~~~~CCCCCC~~~~",
-"~~~~~CCCCCC~~~~",
-"~~~~~~~JJJ~~~~~",
-"~~~~~~~JJJ~~~~~",
-"~~~~~~~~~~~~~~~",
-"~~~~~~~~~~~~~~~"
+"~~~~~UUUUUU~~~~~~~",
+"~~~~~UUUUUU~~~~~~~",
+"~~~~~~~UUUU~~~~~~~",
+"~~GGGG~~~~~CCCC~~~",
+"~~GGGG~~~~~CCCC~~~",
+"~~GGGG~~~~~CCCC~~~",
+"~~~~~~~JJJJ~~~~~~~",
+"~~~~~~~JJJJ~~~~~~~",
+"~~~~~~~JJJJ~~~~~~~",
+"~~~~~~~JJJJ~~~~~~~",
+"~~~~~~~~~~~~~~~~~~",
+"~~~~~~~~~~~~~~~~~~"
 
 ]
 
 let map=[]
+
+function log(text){
+let l=document.getElementById("log")
+l.innerHTML+=text+"<br>"
+l.scrollTop=l.scrollHeight
+}
 
 function createMap(){
 
@@ -117,12 +129,10 @@ for(let y=0;y<height;y++){
 
 for(let x=0;x<width;x++){
 
-let c=worldMap[y][x]
+let c=mapTemplate[y][x]
 
 if(c==="~"){
-
 map.push({type:"sea"})
-
 }else{
 
 let owner={
@@ -135,7 +145,8 @@ J:"Japan"
 map.push({
 type:"land",
 owner:owner,
-industry:Math.floor(Math.random()*3)+1
+industry:Math.floor(Math.random()*3)+1,
+unit:null
 })
 
 }
@@ -151,19 +162,23 @@ function drawMap(){
 let mapDiv=document.getElementById("map")
 mapDiv.innerHTML=""
 
-map.forEach(tile=>{
+map.forEach((tile,i)=>{
 
 let d=document.createElement("div")
 
 if(tile.type==="sea"){
-
 d.className="tile sea"
-d.innerHTML=""
-
 }else{
 
 d.className="tile "+tile.owner
-d.innerHTML=tile.owner
+
+let txt=tile.owner
+
+if(tile.unit){
+txt+="<br>"+tile.unit.str
+}
+
+d.innerHTML=txt
 
 }
 
@@ -173,21 +188,18 @@ mapDiv.appendChild(d)
 
 }
 
-function log(t){
+function updateStats(){
 
-let l=document.getElementById("log")
-l.innerHTML+=t+"<br>"
-l.scrollTop=l.scrollHeight
+let army=countries[PLAYER].army
+let ind=0
 
-}
+map.forEach(t=>{
+if(t.owner===PLAYER) ind+=t.industry||0
+})
 
-function updateUI(){
-
-let playerArmy=countries[playerCountry].army
-
-document.getElementById("ui").innerHTML=
-"Your Country: "+playerCountry+
-" | Army: "+playerArmy
+document.getElementById("playerCountry").innerText=PLAYER
+document.getElementById("army").innerText=army
+document.getElementById("industry").innerText=ind
 
 }
 
@@ -207,43 +219,90 @@ countries[c].army+=prod
 
 }
 
-function attack(){
+function spawnUnits(){
 
-let landTiles=map
-.map((t,i)=>({tile:t,index:i}))
-.filter(t=>t.tile.type==="land")
+map.forEach(tile=>{
 
-let from=landTiles[Math.floor(Math.random()*landTiles.length)]
+if(tile.type!=="land") return
 
-let directions=[-1,1,width,-width]
+if(Math.random()<0.05){
 
-let toIndex=from.index+directions[Math.floor(Math.random()*4)]
+tile.unit={
+owner:tile.owner,
+str:Math.floor(Math.random()*20)+10
+}
 
-if(toIndex<0||toIndex>=map.length)return
+}
 
-let target=map[toIndex]
+})
 
-if(target.type!=="land")return
-if(target.owner===from.tile.owner)return
+}
 
-let attacker=from.tile.owner
-let defender=target.owner
+function moveUnits(){
 
-let atk=countries[attacker].army*Math.random()
-let def=countries[defender].army*Math.random()
+map.forEach((tile,i)=>{
 
-if(atk>def){
+if(!tile.unit) return
 
-target.owner=attacker
-countries[defender].army-=5
+let dirs=[-1,1,width,-width]
 
-log(attacker+" captured land from "+defender)
+let target=i+dirs[Math.floor(Math.random()*4)]
+
+if(target<0||target>=map.length) return
+
+let t=map[target]
+
+if(t.type==="sea") return
+
+if(!t.unit){
+
+t.unit=tile.unit
+tile.unit=null
 
 }else{
 
-countries[attacker].army-=5
+battle(tile,t)
 
 }
+
+})
+
+}
+
+function battle(a,b){
+
+let atk=a.unit
+let def=b.unit
+
+if(atk.owner===def.owner) return
+
+let atkPower=atk.str*Math.random()
+let defPower=def.str*Math.random()
+
+if(atkPower>defPower){
+
+b.unit=atk
+a.unit=null
+
+b.owner=atk.owner
+
+countries[def.owner].army-=10
+
+log(atk.owner+" captured land")
+
+}else{
+
+a.unit=null
+countries[atk.owner].army-=10
+
+}
+
+}
+
+function aiActions(){
+
+spawnUnits()
+moveUnits()
 
 }
 
@@ -251,18 +310,19 @@ function nextTurn(){
 
 produce()
 
-for(let i=0;i<8;i++){
-attack()
-}
+aiActions()
 
 drawMap()
-updateUI()
+
+updateStats()
 
 }
 
 createMap()
+
 drawMap()
-updateUI()
+
+updateStats()
 
 </script>
 
