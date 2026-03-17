@@ -2,151 +2,89 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Mini HOI4 Browser Game</title>
+<title>Playable Strategy Game</title>
 
 <style>
-
 body{
 background:#0f172a;
 color:white;
-font-family:Arial;
 text-align:center;
-}
-
-#topbar{
-padding:10px;
-background:#1e293b;
+font-family:Arial;
 }
 
 #map{
 display:grid;
-grid-template-columns:repeat(20,35px);
-gap:1px;
+grid-template-columns:repeat(10,50px);
+gap:2px;
 justify-content:center;
-margin-top:10px;
+margin-top:20px;
 }
 
 .tile{
-width:35px;
-height:35px;
-font-size:8px;
+width:50px;
+height:50px;
 display:flex;
 align-items:center;
 justify-content:center;
-border:1px solid #111;
+font-size:12px;
+cursor:pointer;
+border:2px solid #111;
 }
 
-.sea{background:#1d4ed8}
+.selected{
+border:2px solid white;
+}
 
-.Japan{background:#ef4444}
-.Germany{background:#3b82f6}
-.USA{background:#22c55e}
-.USSR{background:#facc15;color:black}
-.China{background:#a855f7}
+.Japan{background:#ef4444;}
+.Enemy{background:#3b82f6;}
+.sea{background:#1d4ed8;}
 
-#panel{
+#info{
 margin-top:10px;
 }
 
 button{
-padding:8px 15px;
-margin:5px;
-}
-
-#log{
-background:#111;
-width:700px;
-height:180px;
-overflow:auto;
-margin:auto;
 margin-top:10px;
-text-align:left;
-padding:6px;
+padding:10px;
 }
-
 </style>
-</head>
 
+</head>
 <body>
 
-<div id="topbar">
-Player Country: <span id="playerCountry"></span>
- | Army: <span id="army"></span>
- | Industry: <span id="industry"></span>
-</div>
+<h2>Strategy Game（操作できる版）</h2>
+
+<div id="info">クリックでユニットを動かせ</div>
 
 <div id="map"></div>
 
-<div id="panel">
-<button onclick="nextTurn()">Next Turn</button>
-</div>
-
-<div id="log"></div>
+<button onclick="endTurn()">ターン終了</button>
 
 <script>
 
-const width=20
-const height=12
-
-const PLAYER="Japan"
-
-const countries={
-Japan:{army:80,industry:0},
-USA:{army:100,industry:0},
-Germany:{army:90,industry:0},
-USSR:{army:120,industry:0},
-China:{army:110,industry:0}
-}
-
-const mapTemplate=[
-
-"~~~~~UUUUUU~~~~~~~",
-"~~~~~UUUUUU~~~~~~~",
-"~~~~~~~UUUU~~~~~~~",
-"~~GGGG~~~~~CCCC~~~",
-"~~GGGG~~~~~CCCC~~~",
-"~~GGGG~~~~~CCCC~~~",
-"~~~~~~~JJJJ~~~~~~~",
-"~~~~~~~JJJJ~~~~~~~",
-"~~~~~~~JJJJ~~~~~~~",
-"~~~~~~~JJJJ~~~~~~~",
-"~~~~~~~~~~~~~~~~~~",
-"~~~~~~~~~~~~~~~~~~"
-
-]
-
+const W=10,H=10
 let map=[]
-
-function log(text){
-let l=document.getElementById("log")
-l.innerHTML+=text+"<br>"
-l.scrollTop=l.scrollHeight
-}
+let selected=null
 
 function createMap(){
 
-for(let y=0;y<height;y++){
+for(let i=0;i<W*H;i++){
 
-for(let x=0;x<width;x++){
+let type=Math.random()<0.2?"sea":"land"
 
-let c=mapTemplate[y][x]
-
-if(c==="~"){
+if(type==="sea"){
 map.push({type:"sea"})
 }else{
 
-let owner={
-U:"USA",
-G:"Germany",
-C:"China",
-J:"Japan"
-}[c]
+let owner=Math.random()<0.5?"Japan":"Enemy"
 
 map.push({
 type:"land",
 owner:owner,
-industry:Math.floor(Math.random()*3)+1,
-unit:null
+unit:{
+owner:owner,
+str:Math.floor(Math.random()*10)+5
+}
 })
 
 }
@@ -155,113 +93,136 @@ unit:null
 
 }
 
-}
+function draw(){
 
-function drawMap(){
+const m=document.getElementById("map")
+m.innerHTML=""
 
-let mapDiv=document.getElementById("map")
-mapDiv.innerHTML=""
-
-map.forEach((tile,i)=>{
+map.forEach((t,i)=>{
 
 let d=document.createElement("div")
 
-if(tile.type==="sea"){
-d.className="tile sea"
+d.className="tile "+(t.owner||"sea")
+
+if(i===selected) d.classList.add("selected")
+
+if(t.type==="land"){
+d.innerHTML=t.unit?t.unit.str:""
+}
+
+d.onclick=()=>clickTile(i)
+
+m.appendChild(d)
+
+})
+
+}
+
+function clickTile(i){
+
+let tile=map[i]
+
+// 選択
+if(selected===null){
+
+if(tile.unit && tile.unit.owner==="Japan"){
+selected=i
+draw()
+}
+
+return
+}
+
+// 移動/攻撃
+let from=map[selected]
+let to=tile
+
+let dirs=[-1,1,W,-W]
+
+if(!dirs.includes(i-selected)){
+selected=null
+draw()
+return
+}
+
+// 海は不可
+if(to.type==="sea"){
+selected=null
+draw()
+return
+}
+
+// 戦闘
+if(to.unit){
+
+if(to.unit.owner!=="Japan"){
+
+if(from.unit.str>to.unit.str){
+
+to.unit=from.unit
+to.owner="Japan"
+from.unit=null
+
 }else{
-
-d.className="tile "+tile.owner
-
-let txt=tile.owner
-
-if(tile.unit){
-txt+="<br>"+tile.unit.str
+from.unit=null
 }
-
-d.innerHTML=txt
-
-}
-
-mapDiv.appendChild(d)
-
-})
-
-}
-
-function updateStats(){
-
-let army=countries[PLAYER].army
-let ind=0
-
-map.forEach(t=>{
-if(t.owner===PLAYER) ind+=t.industry||0
-})
-
-document.getElementById("playerCountry").innerText=PLAYER
-document.getElementById("army").innerText=army
-document.getElementById("industry").innerText=ind
-
-}
-
-function produce(){
-
-for(let c in countries){
-
-let prod=0
-
-map.forEach(t=>{
-if(t.owner===c) prod+=t.industry||0
-})
-
-countries[c].army+=prod
-
-}
-
-}
-
-function spawnUnits(){
-
-map.forEach(tile=>{
-
-if(tile.type!=="land") return
-
-if(Math.random()<0.05){
-
-tile.unit={
-owner:tile.owner,
-str:Math.floor(Math.random()*20)+10
-}
-
-}
-
-})
-
-}
-
-function moveUnits(){
-
-map.forEach((tile,i)=>{
-
-if(!tile.unit) return
-
-let dirs=[-1,1,width,-width]
-
-let target=i+dirs[Math.floor(Math.random()*4)]
-
-if(target<0||target>=map.length) return
-
-let t=map[target]
-
-if(t.type==="sea") return
-
-if(!t.unit){
-
-t.unit=tile.unit
-tile.unit=null
 
 }else{
 
-battle(tile,t)
+// 味方移動
+to.unit=from.unit
+from.unit=null
+
+}
+
+}else{
+
+// 空き地移動
+to.unit=from.unit
+to.owner="Japan"
+from.unit=null
+
+}
+
+selected=null
+draw()
+
+}
+
+function enemyTurn(){
+
+map.forEach((t,i)=>{
+
+if(t.unit && t.unit.owner==="Enemy"){
+
+let dirs=[-1,1,W,-W]
+let move=i+dirs[Math.floor(Math.random()*4)]
+
+if(move<0||move>=map.length)return
+
+let target=map[move]
+
+if(target.type==="sea") return
+
+if(!target.unit){
+
+target.unit=t.unit
+target.owner="Enemy"
+t.unit=null
+
+}else if(target.unit.owner==="Japan"){
+
+if(t.unit.str>target.unit.str){
+
+target.unit=t.unit
+target.owner="Enemy"
+t.unit=null
+
+}else{
+t.unit=null
+}
+
+}
 
 }
 
@@ -269,60 +230,15 @@ battle(tile,t)
 
 }
 
-function battle(a,b){
+function endTurn(){
 
-let atk=a.unit
-let def=b.unit
-
-if(atk.owner===def.owner) return
-
-let atkPower=atk.str*Math.random()
-let defPower=def.str*Math.random()
-
-if(atkPower>defPower){
-
-b.unit=atk
-a.unit=null
-
-b.owner=atk.owner
-
-countries[def.owner].army-=10
-
-log(atk.owner+" captured land")
-
-}else{
-
-a.unit=null
-countries[atk.owner].army-=10
-
-}
-
-}
-
-function aiActions(){
-
-spawnUnits()
-moveUnits()
-
-}
-
-function nextTurn(){
-
-produce()
-
-aiActions()
-
-drawMap()
-
-updateStats()
+enemyTurn()
+draw()
 
 }
 
 createMap()
-
-drawMap()
-
-updateStats()
+draw()
 
 </script>
 
