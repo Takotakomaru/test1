@@ -1,3 +1,74 @@
-フルーツ
-フルーツケーキ　
+import random
+
+class Country:
+    def __init__(self, name, army, industry, resources):
+        self.name = name
+        self.army = army
+        self.industry = industry
+        self.resources = resources
+        self.alive = True
+
+    def produce(self):
+        produced = self.industry + random.randint(0, 3)
+        self.army += produced
+        print(f"{self.name} produced {produced} troops.")
+
+    def attack(self, enemy):
+        if not enemy.alive:
+            return
+        
+        attack_power = self.army * random.uniform(0.5, 1.5)
+        defense_power = enemy.army * random.uniform(0.5, 1.5)
+
+        print(f"{self.name} attacks {enemy.name}!")
+
+        if attack_power > defense_power:
+            loss = random.randint(5,15)
+            enemy.army -= loss
+            print(f"{enemy.name} lost {loss} troops!")
+        else:
+            loss = random.randint(5,15)
+            self.army -= loss
+            print(f"{self.name} lost {loss} troops!")
+
+        if enemy.army <= 0:
+            enemy.alive = False
+            print(f"{enemy.name} has collapsed!")
+
+class Game:
+
+    def __init__(self):
+        self.turn = 1
+        self.countries = [
+            Country("Japan", 50, 10, 20),
+            Country("Germany", 60, 12, 15),
+            Country("USA", 80, 15, 25),
+            Country("Soviet Union", 70, 13, 20)
+        ]
+
+    def alive_countries(self):
+        return [c for c in self.countries if c.alive]
+
+    def run_turn(self):
+        print("\n------ Turn", self.turn, "------")
+
+        for c in self.alive_countries():
+            c.produce()
+
+        attacker = random.choice(self.alive_countries())
+        target = random.choice([c for c in self.alive_countries() if c != attacker])
+
+        attacker.attack(target)
+
+        self.turn += 1
+
+    def run(self):
+        while len(self.alive_countries()) > 1:
+            self.run_turn()
+
+        winner = self.alive_countries()[0]
+        print("\nWinner:", winner.name)
+
+game = Game()
+game.run()　
 　
