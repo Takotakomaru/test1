@@ -2,57 +2,43 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Full Strategy Game</title>
+<title>Advanced Strategy Game</title>
 
 <style>
 body{background:#0f172a;color:white;font-family:Arial;text-align:center;}
 #top{background:#1e293b;padding:10px;}
-#map{display:grid;grid-template-columns:repeat(12,50px);gap:2px;justify-content:center;margin-top:10px;}
-.tile{width:50px;height:50px;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid #111;cursor:pointer;}
+#map{display:grid;grid-template-columns:repeat(14,45px);gap:2px;justify-content:center;margin-top:10px;}
+.tile{width:45px;height:45px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;border:2px solid #111;cursor:pointer;}
 .selected{border:2px solid white;}
+.frontline{outline:2px solid yellow;}
 .Japan{background:#ef4444;}
 .Enemy{background:#3b82f6;}
-.Neutral{background:#666;}
 .sea{background:#1d4ed8;}
-#panel{margin-top:10px;}
-button{padding:8px;margin:3px;}
-#log{background:#111;width:700px;height:200px;overflow:auto;margin:auto;margin-top:10px;text-align:left;padding:5px;}
+.capital{border:2px solid gold;}
+#log{background:#111;width:800px;height:200px;overflow:auto;margin:auto;margin-top:10px;text-align:left;padding:5px;}
+button{padding:8px;margin:5px;}
 </style>
 
 </head>
 <body>
 
 <div id="top">
-国: <span id="country"></span> |
-軍: <span id="army"></span> |
-工業: <span id="industry"></span> |
-ターン: <span id="turn"></span>
+国: 日本 | ターン: <span id="turn"></span>
 </div>
 
 <div id="map"></div>
 
-<div id="panel">
-<button onclick="produceUnit()">ユニット生産</button>
 <button onclick="endTurn()">ターン終了</button>
-</div>
 
 <div id="log"></div>
 
 <script>
 
-// ================= 基本設定 =================
-const W=12,H=12
-const PLAYER="Japan"
+// ================= 基本 =================
+const W=14,H=14
 let turn=1
-let selected=null
 let map=[]
-
-// ================= 国家 =================
-const countries={
-Japan:{army:50},
-Enemy:{army:60},
-Neutral:{army:0}
-}
+let selected=null
 
 // ================= ログ =================
 function log(t){
@@ -63,92 +49,133 @@ l.scrollTop=l.scrollHeight
 
 // ================= マップ生成 =================
 function createMap(){
+
 for(let i=0;i<W*H;i++){
 
-let type=Math.random()<0.15?"sea":"land"
+let sea=Math.random()<0.1
 
-if(type==="sea"){
+if(sea){
 map.push({type:"sea"})
-}else{
+continue
+}
 
-let ownerRand=Math.random()
-let owner="Neutral"
-
-if(ownerRand<0.4) owner="Japan"
-else if(ownerRand<0.8) owner="Enemy"
+let owner=Math.random()<0.5?"Japan":"Enemy"
 
 map.push({
 type:"land",
 owner:owner,
-industry:Math.floor(Math.random()*3)+1,
-unit: Math.random()<0.3 ? {
-owner:owner,
-hp:20,
-atk:Math.floor(Math.random()*10)+5
-} : null
+units:[],
+capital:false
 })
 
 }
 
+// 首都
+map[5].capital=true
+map[W*H-5].capital=true
+
 }
+
+// ================= ユニット生成 =================
+function spawnInitial(){
+
+map.forEach(t=>{
+if(t.type==="land"){
+
+let n=Math.floor(Math.random()*2)
+
+for(let i=0;i<n;i++){
+t.units.push({
+owner:t.owner,
+hp:20,
+atk:8
+})
+}
+
+}
+
+})
+
 }
 
 // ================= 描画 =================
 function draw(){
-const m=document.getElementById("map")
+
+let m=document.getElementById("map")
 m.innerHTML=""
 
 map.forEach((t,i)=>{
 
 let d=document.createElement("div")
-d.className="tile "+(t.owner||"sea")
+
+if(t.type==="sea"){
+d.className="tile sea"
+}else{
+
+d.className="tile "+t.owner
+
+if(t.capital) d.classList.add("capital")
+
+let txt=""
+
+t.units.forEach(u=>{
+txt+=u.hp+" "
+})
+
+d.innerHTML=txt
+
+}
+
+if(isFrontline(i)) d.classList.add("frontline")
 
 if(i===selected) d.classList.add("selected")
-
-if(t.type==="land"){
-if(t.unit){
-d.innerHTML=t.unit.hp+"<br>"+t.unit.atk
-}
-}
 
 d.onclick=()=>clickTile(i)
 
 m.appendChild(d)
 
 })
-}
 
-// ================= UI更新 =================
-function updateUI(){
-
-let army=countries[PLAYER].army
-let ind=0
-
-map.forEach(t=>{
-if(t.owner===PLAYER) ind+=t.industry||0
-})
-
-document.getElementById("country").innerText=PLAYER
-document.getElementById("army").innerText=army
-document.getElementById("industry").innerText=ind
 document.getElementById("turn").innerText=turn
+
 }
 
-// ================= クリック処理 =================
+// ================= 前線判定 =================
+function isFrontline(i){
+
+let t=map[i]
+if(t.type!=="land") return false
+
+let dirs=[-1,1,W,-W]
+
+for(let d of dirs){
+
+let n=i+d
+if(n<0||n>=map.length) continue
+
+if(map[n].owner!==t.owner && map[n].type==="land"){
+return true
+}
+
+}
+
+return false
+}
+
+// ================= クリック =================
 function clickTile(i){
 
 let t=map[i]
 
-// 選択
 if(selected===null){
-if(t.unit && t.unit.owner===PLAYER){
+
+if(t.units.some(u=>u.owner==="Japan")){
 selected=i
 draw()
 }
 return
 }
 
-// 移動
 let from=map[selected]
 let to=map[i]
 
@@ -160,137 +187,87 @@ draw()
 return
 }
 
-// 海不可
 if(to.type==="sea"){
 selected=null
 draw()
 return
 }
 
-// 戦闘
-if(to.unit){
+// 移動 or 戦闘
+if(to.owner==="Japan"){
 
-if(to.unit.owner!==PLAYER){
+to.units=to.units.concat(from.units)
+from.units=[]
+
+}else{
 
 battle(from,to)
-
-}else{
-
-// 味方移動
-to.unit=from.unit
-from.unit=null
-
-}
-
-}else{
-
-// 空地
-to.unit=from.unit
-to.owner=PLAYER
-from.unit=null
 
 }
 
 selected=null
 draw()
-updateUI()
 
 }
 
 // ================= 戦闘 =================
 function battle(a,b){
 
-let atk=a.unit
-let def=b.unit
+while(a.units.length && b.units.length){
 
-def.hp -= atk.atk
+let atk=a.units[0]
+let def=b.units[0]
+
+def.hp-=atk.atk
 
 if(def.hp<=0){
-b.unit=atk
-b.owner=PLAYER
-a.unit=null
-log("占領成功")
-return
+b.units.shift()
+continue
 }
 
-atk.hp -= def.atk
+atk.hp-=def.atk
 
 if(atk.hp<=0){
-a.unit=null
-log("攻撃失敗")
+a.units.shift()
 }
 
 }
 
-// ================= 生産 =================
-function produce(){
+if(a.units.length>0 && b.units.length===0){
 
-for(let c in countries){
+b.owner="Japan"
+b.units=a.units
+a.units=[]
 
-let prod=0
-
-map.forEach(t=>{
-if(t.owner===c) prod+=t.industry||0
-})
-
-countries[c].army+=prod
+log("領土占領")
 
 }
 
 }
 
-// ================= ユニット生産 =================
-function produceUnit(){
-
-for(let i=0;i<map.length;i++){
-
-let t=map[i]
-
-if(t.owner===PLAYER && !t.unit){
-
-t.unit={
-owner:PLAYER,
-hp:20,
-atk:10
-}
-
-countries[PLAYER].army-=10
-log("ユニット生産")
-
-draw()
-updateUI()
-return
-}
-
-}
-
-}
-
-// ================= 敵AI =================
+// ================= AI =================
 function enemyAI(){
 
 map.forEach((t,i)=>{
 
-if(t.unit && t.unit.owner==="Enemy"){
+if(t.owner!=="Enemy") return
+if(t.units.length===0) return
 
 let dirs=[-1,1,W,-W]
-let move=i+dirs[Math.floor(Math.random()*4)]
 
-if(move<0||move>=map.length)return
+for(let d of dirs){
 
-let target=map[move]
+let n=i+d
+if(n<0||n>=map.length) continue
 
-if(target.type==="sea") return
+let target=map[n]
 
-if(!target.unit){
+if(target.type==="sea") continue
 
-target.unit=t.unit
-target.owner="Enemy"
-t.unit=null
-
-}else if(target.unit.owner==="Japan"){
+if(target.owner==="Japan"){
 
 battle(t,target)
+return
 
 }
 
@@ -300,25 +277,20 @@ battle(t,target)
 
 }
 
-// ================= 勝利判定 =================
+// ================= 勝利 =================
 function checkWin(){
 
-let playerLand=0
-let enemyLand=0
+for(let t of map){
 
-map.forEach(t=>{
-if(t.owner==="Japan") playerLand++
-if(t.owner==="Enemy") enemyLand++
-})
-
-if(enemyLand===0){
-alert("勝利！")
+if(t.capital && t.owner==="Enemy"){
+alert("敗北")
 location.reload()
 }
 
-if(playerLand===0){
-alert("敗北…")
-location.reload()
+if(t.capital && t.owner==="Japan"){
+// OK
+}
+
 }
 
 }
@@ -326,20 +298,17 @@ location.reload()
 // ================= ターン =================
 function endTurn(){
 
-produce()
 enemyAI()
 turn++
-
 draw()
-updateUI()
 checkWin()
 
 }
 
 // ================= 初期化 =================
 createMap()
+spawnInitial()
 draw()
-updateUI()
 
 </script>
 
